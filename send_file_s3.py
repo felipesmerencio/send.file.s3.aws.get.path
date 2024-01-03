@@ -3,7 +3,8 @@ import boto3
 from botocore.exceptions import ClientError
 import os
 from datetime import datetime
-from dotenv import load_dotenv  # pip3 install python-dotenv
+from dotenv import load_dotenv
+import pandas as pd  # Adicionei a importação do pandas para trabalhar com Excel
 
 def get_credentials_aws():
     access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
@@ -11,55 +12,62 @@ def get_credentials_aws():
     bucket_name = os.getenv('AWS_BUCKET_NAME')
     return access_key_id, secret_access_key, bucket_name
 
-def upload_to_s3_aws(file_name, access_key_id, secret_access_key, bucket_name):
+def upload_to_s3_aws(file_name, access_key_id, secret_access_key, bucket_name, destination_path):
     s3_client = boto3.client(
         's3',
         aws_access_key_id=access_key_id,
         aws_secret_access_key=secret_access_key
     )
     try:
-        # Obter a data atual
         current_date = datetime.now()
-        
-        # Formatar a data no formato YYYY/MM/DD
         formatted_date = current_date.strftime('%Y/%m/%d')
         
-        # Montar o caminho completo para o upload
-        upload_path = os.path.join(formatted_date, os.path.basename(file_name))
+        # Alteração no nome do arquivo para adicionar "-2"
+        upload_path = os.path.join(destination_path, formatted_date, os.path.basename(file_name).replace('.mp3', '-2.mp3'))
         
         response = s3_client.upload_file(file_name, bucket_name, upload_path)
         
-        # Check if the file was uploaded successfully
-        try:
-            # Gerar o URL assinado para download
-            url = s3_client.generate_presigned_url('get_object',
-                                            Params={'Bucket': bucket_name, 'Key': upload_path},
-                                            )
+        # Geração do URL assinado para download
+        url = s3_client.generate_presigned_url('get_object',
+                                              Params={'Bucket': bucket_name, 'Key': upload_path},
+                                              )
         
-            print(f"URL para download do arquivo: {url}")
-            return True
-        except Exception as e:
-            print(f"Erro ao gerar URL assinado: {e}") 
-            return False              
+        print(f"URL para download do arquivo: {url}")
+        return url
     except ClientError as e:
         logging.error(e)
-        return False
+        return None
 
 def main():
-    file_name = '132.mp3'
-    
+    base_folder = 'audios'
+    destination_folder = 'reprocessamento'
+    excel_data = []
+
     access_key_id, secret_access_key, bucket_name = get_credentials_aws()
-        
+
     if access_key_id and secret_access_key and bucket_name:
-        # Adicionando a verificação de se o arquivo realmente existe
-        if os.path.isfile(file_name):
-            print(f"Upload para AWS S3: {file_name}")
-            upload_to_s3_aws(file_name, access_key_id, secret_access_key, bucket_name)
-        else:
-            logging.error(f"O arquivo {file_name} não existe.")
+        for root, dirs, files in os.walk(base_folder):
+            for file_name in files:
+                if file_name.endswith('.mp3'):
+                    full_path = os.path.join(root, file_name)
+                    print(f"Upload para AWS S3: {full_path}")
+
+                    # Alteração na chamada da função para incluir o novo destino
+                    url = upload_to_s3_aws(full_path, access_key_id, secret_access_key, bucket_name, destination_folder)
+
+                    if url:
+                        file_id = os.path.splitext(file_name)[0]
+                        excel_data.append({'id': file_id, 'link': url})
+                else:
+                    logging.warning(f"Arquivo {file_name} não é um arquivo de áudio MP3.")
+
+        # Criando o DataFrame e salvando para um arquivo Excel
+        df = pd.DataFrame(excel_data)
+        df.to_excel('output.xlsx', index=False)
+        print("Planilha Excel criada com sucesso.")
     else:
         logging.error("Credenciais AWS não configuradas corretamente")
 
 if __name__ == "__main__":
-    load_dotenv()  # Certifique-se de carregar as variáveis de ambiente do arquivo .env
+    load_dotenv()
     main()
