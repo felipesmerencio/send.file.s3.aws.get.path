@@ -1,4 +1,4 @@
-# criar o arquivo .env na raiz do projeto. Com as credencias AWS s3
+# create the .env file in the project root. With AWS s3 credentials
 
 ```
 AWS_ACCESS_KEY_ID=value
