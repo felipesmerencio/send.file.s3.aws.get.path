@@ -86,7 +86,8 @@ def main():
 
         # Criando o DataFrame e salvando para um arquivo Excel
         df = pd.DataFrame(excel_data)
-        df.to_excel("output.xlsx", index=False)
+        # df.to_excel("output.xlsx", index=False)
+        df.to_csv("output.csv", index=False)
         print("Planilha Excel criada com sucesso.")
     else:
         logging.error("Credenciais AWS não configuradas corretamente")
