@@ -24,6 +24,11 @@ def upload_to_s3_aws(
         current_date = datetime.now()
         formatted_date = current_date.strftime("%Y/%m/%d")
 
+        # Verificar se o nome do arquivo contém traço "-"
+        if "-" in os.path.basename(file_name):
+            logging.warning(f"Ignorando arquivo {file_name} pois contém traço no nome.")
+            return None
+
         # Alteração no nome do arquivo para adicionar "-2"
         upload_path = os.path.join(
             destination_path,
@@ -63,7 +68,7 @@ def main():
     if access_key_id and secret_access_key and bucket_name:
         for root, dirs, files in os.walk(base_folder):
             for file_name in files:
-                if file_name.endswith(".mp3"):
+                if file_name.endswith(".mp3") and "-" not in file_name:
                     full_path = os.path.join(root, file_name)
                     print(f"Upload para AWS S3: {full_path}")
 
@@ -81,7 +86,7 @@ def main():
                         excel_data.append({"id": file_id, "link": url})
                 else:
                     logging.warning(
-                        f"Arquivo {file_name} não é um arquivo de áudio MP3."
+                        f"Arquivo {file_name} não é um arquivo de áudio MP3 ou contém traço no nome."
                     )
 
         # Criando o DataFrame e salvando para um arquivo Excel
